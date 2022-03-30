@@ -1,0 +1,20 @@
+{{- range $appname, $values := .Values.deployments }}
+{{- if and $values.service $values.service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $appname }}
+  labels:
+    {{- include "helloworld.labels" $ | nindent 4 }}
+spec:
+  type: {{ $values.service.type }}
+  ports:
+    - port: {{ $values.service.port | default 8080 }}
+      targetPort: {{ $values.service.targetPort | default 8080 }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "helloworld.selectorLabels" $ | nindent 4 }}-{{ $appname }}
+{{- end }}
+{{ end }}

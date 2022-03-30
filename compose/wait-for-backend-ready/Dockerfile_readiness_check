@@ -1,0 +1,6 @@
+FROM alpine:3.14
+RUN apk add --no-cache curl
+COPY ./waiter.sh /usr/bin/waiter.sh
+RUN chmod +x /usr/bin/waiter.sh
+ENTRYPOINT ["waiter.sh"]
+CMD ["echo", "Run command in wait container"]

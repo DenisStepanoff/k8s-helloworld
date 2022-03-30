@@ -1,0 +1,44 @@
+deployments:
+  backend:
+    envs:
+      PROJECT: "helloworld"
+      STAND: "DEV"
+    service:
+      enabled: true 
+      port: 8080
+      targetPort: 8080
+      type: ClusterIP
+    ingress: #ingress not implemented in templates
+      enabled: false
+    image:
+      repository: gdfghytr/helloworld:latest
+    livenessProbe:
+      httpGet:
+        path: /api/health-check
+        port: 8080
+      initialDelaySeconds: 10
+      periodSeconds: 5
+    readinessProbe:
+      httpGet:
+        path: /
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      failureThreshold: 3
+    resources:
+      limits:
+        cpu: 100m
+        memory: 200Mi
+      requests:
+        cpu: 50m
+        memory: 50Mi
+#other apps
+  frontend:
+    disabled: true
+    service:
+      enabled: false
+image:
+  pullPolicy: IfNotPresent
+ingress:
+  enabled: false
+

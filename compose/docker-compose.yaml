@@ -1,0 +1,42 @@
+version: '3.4'
+services:
+
+  hw-backend:
+    build: ./backend/
+    container_name: hw-backend
+    image: "hw-backend"
+    ports:
+      - 8080:8080
+    healthcheck:
+      test: curl --fail -s http://localhost:8080/ || exit 1
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+  wait-for-backend-ready:
+    build:
+      context: ./wait-for-backend-ready/
+      dockerfile: Dockerfile_readiness_check
+    container_name: wait-for-backend-ready
+    image: wait-for-backens-ready
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.31.2
+    volumes:
+      - ./prometheus/config.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - 9090:9090
+
+  grafana:
+    container_name: grafana
+    image: "grafana/grafana:8.3.6"
+    depends_on:
+      - prometheus
+    volumes:
+      - ./grafana/grafana_dashboard.json:/etc/grafana/provisioning/dashboards/grafana_dashboard.json
+      - ./grafana/grafana_dashboard.yml:/etc/grafana/provisioning/dashboards/grafana_dashboard.yml
+      - ./grafana/grafana_datasource.yml:/etc/grafana/provisioning/datasources/grafana_datasource.yml
+    ports:
+      - 3000:3000
+

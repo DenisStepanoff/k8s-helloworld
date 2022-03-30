@@ -1,0 +1,52 @@
+{{/*
+loop for creating deployments for applications from values
+*/}}
+{{- range $appname, $values := .Values.deployments -}}
+{{- if not $values.disabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "helloworld.fullname" $ }}-{{ $appname }}
+  labels:
+    {{- include "helloworld.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "helloworld.selectorLabels" $ | nindent 6 }}-{{ $appname }}
+  template:
+    metadata:
+    {{- with $values.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "helloworld.selectorLabels" $ | nindent 8 }}-{{ $appname }}
+    spec:
+      containers:
+        - name: {{ $.Chart.Name }}-{{ $appname }}
+          image: "{{ $values.image.repository }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          {{- if $values.livenessProbe }}
+          livenessProbe:
+          {{- toYaml $values.livenessProbe | nindent 12 }}
+          {{ end }}
+          {{- if $values.readinessProbe }}
+          readinessProbe:
+          {{- toYaml $values.readinessProbe | nindent 12 }}
+          {{ end }}
+          ports:
+            - name: http
+              containerPort: {{ $values.service.targetPort | default 80 }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ $.Release.Name }}-{{ $appname }}
+          resources:
+            {{- with $values.resources }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+{{ end }}
+{{ end }}
+

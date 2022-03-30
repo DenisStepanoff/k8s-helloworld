@@ -1,0 +1,17 @@
+{{- range $appname, $values := .Values.deployments }}
+{{- if not $values.disabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Release.Name }}-{{ $appname }}
+  labels:
+    app: {{ include "helloworld.name" $ }}
+    chart: {{ include "helloworld.chart" $ }}
+    release: {{ $.Release.Name }}
+data:
+{{- range $key, $value :=  $values.envs }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
+{{ end }}
+{{ end }}
