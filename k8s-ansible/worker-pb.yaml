@@ -2,6 +2,7 @@
   hosts: workers
   become: true
   tasks:
+  - include_vars: vars.yaml
   - name: Update and Upgrade
     ansible.builtin.apt:
       upgrade: yes
@@ -47,9 +48,9 @@
       update_cache: true
       state: present
     with_items:
-      - 'kubelet'
-      - 'kubeadm'
-      - 'kubectl'
+      - "kubelet={{ k8s_version  }}"
+      - "kubeadm={{ k8s_version  }}"
+      - "kubectl={{ k8s_version  }}"
   - name: Hold k8s components
     dpkg_selections:
       name: "{{ item }}"
