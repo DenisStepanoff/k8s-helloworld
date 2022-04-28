@@ -1,0 +1,97 @@
+- name: Prepare tasks
+  hosts: master
+  become: true
+  tasks:
+  - name: Update and Upgrade
+    ansible.builtin.apt:
+      upgrade: yes
+      update_cache: yes
+  - name: Install Docker
+    ansible.builtin.apt:
+      name: docker.io
+      state: present
+  - name: Docker started and enabled
+    ansible.builtin.systemd:
+      name: docker
+      state: started
+      enabled: yes
+  - name: Add den to the group docker
+    ansible.builtin.user:
+      name: den
+      group: docker
+  - name: Disable swap in runtime
+    ansible.builtin.command: swapoff -a
+  - name: Disable swap permanently
+    ansible.builtin.replace:
+      path: /etc/fstab
+      regexp: '^(\s*)([^#\n]+\s+)(\w+\s+)swap(\s+.*)$'
+      replace: '#\1\2\3swap\4'
+      backup: yes
+    notify:
+    - Reboot host
+  - name: "Flush handlers"
+    meta: flush_handlers
+#  - name: Reboot host
+#    reboot:
+  - name: Add k8s apt-key
+    ansible.builtin.apt_key:
+      url: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+      state: present
+  - name: Add k8s repo
+    ansible.builtin.apt_repository:
+      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+  - name: Install k8s components
+    apt:
+      name: "{{ item }}"
+      update_cache: true
+      state: present
+    with_items:
+      - 'kubelet'
+      - 'kubeadm'
+      - 'kubectl'
+  - name: Hold k8s components
+    dpkg_selections:
+      name: "{{ item }}"
+      selection: hold
+    with_items:
+      - 'kubelet'
+      - 'kubeadm'
+      - 'kubectl'
+  - name: Copy docker configuration
+    ansible.builtin.copy:
+      src: daemon.json
+      dest: /etc/docker/daemon.json
+      owner: root
+      group: root
+      mode: u=rw,g=r,o=r
+    notify:
+    - Restart Docker
+  - name: "Flush handlers"
+    meta: flush_handlers
+#  - name: Restart Docker
+#    ansible.builtin.systemd:
+#      name: docker
+#      state: restarted
+  - name: Collect facts about kubelet service
+    ansible.builtin.systemd:
+      name: "kubelet"
+    register: kubelet_status
+  - name: Init k8s cluster
+    ansible.builtin.shell:
+      cmd: kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.0.145
+    when: kubelet_status.status.ActiveState == "activating"
+  - name: Deploy CNI plugin
+    ansible.builtin.shell: |
+      kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml --kubeconfig /etc/kubernetes/admin.conf
+      kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/k8s-manifests/kube-flannel-rbac.yml --kubeconfig /etc/kubernetes/admin.conf
+    when: kubelet_status.status.ActiveState == "activating"
+
+  handlers:
+    - name: Reboot host
+      reboot:
+    - name: Restart Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+

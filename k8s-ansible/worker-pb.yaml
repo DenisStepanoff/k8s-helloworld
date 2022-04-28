@@ -1,0 +1,101 @@
+- name: Prepare tasks
+  hosts: workers
+  become: true
+  tasks:
+  - name: Update and Upgrade
+    ansible.builtin.apt:
+      upgrade: yes
+      update_cache: yes
+  - name: Install Docker
+    ansible.builtin.apt:
+      name: docker.io
+      state: present
+  - name: Docker started and enabled
+    ansible.builtin.systemd:
+      name: docker
+      state: started
+      enabled: yes
+  - name: Add den to the group docker
+    ansible.builtin.user:
+      name: den
+      group: docker
+  - name: Disable swap in runtime
+    ansible.builtin.command: swapoff -a
+  - name: Disable swap permanently
+    ansible.builtin.replace:
+      path: /etc/fstab
+      regexp: '^(\s*)([^#\n]+\s+)(\w+\s+)swap(\s+.*)$'
+      replace: '#\1\2\3swap\4'
+      backup: yes
+    notify:
+    - Reboot host
+  - name: "Flush handlers"
+    meta: flush_handlers
+#  - name: Reboot host
+#    reboot:
+  - name: Add k8s apt-key
+    ansible.builtin.apt_key:
+      url: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+      state: present
+  - name: Add k8s repo
+    ansible.builtin.apt_repository:
+      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+  - name: Install k8s components
+    apt:
+      name: "{{ item }}"
+      update_cache: true
+      state: present
+    with_items:
+      - 'kubelet'
+      - 'kubeadm'
+      - 'kubectl'
+  - name: Hold k8s components
+    dpkg_selections:
+      name: "{{ item }}"
+      selection: hold
+    with_items:
+      - 'kubelet'
+      - 'kubeadm'
+      - 'kubectl'
+  - name: Copy docker configuration
+    ansible.builtin.copy:
+      src: daemon.json
+      dest: /etc/docker/daemon.json
+      owner: root
+      group: root
+      mode: u=rw,g=r,o=r
+    notify:
+    - Restart Docker
+  - name: "Flush handlers"
+    meta: flush_handlers
+#  - name: Restart Docker
+#    ansible.builtin.systemd:
+#      name: docker
+#      state: restarted
+  - name: Collect facts about kubelet service
+    ansible.builtin.systemd:
+      name: "kubelet"
+    register: kubelet_status
+  - name: Get join command
+    ansible.builtin.shell:
+      cmd: kubeadm token create --print-join-command
+    delegate_to: "{{ groups['master'][0] }}"
+    register: join_command
+    delegate_facts: True
+    when: kubelet_status.status.ActiveState == "activating"
+  - name: Join to claster
+    ansible.builtin.shell:
+      cmd: "{{join_command.stdout}}"
+    when: kubelet_status.status.ActiveState == "activating"
+
+  handlers:
+    - name: Reboot host
+      reboot:
+    - name: Restart Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+#  - debug: msg="{{join_command.stdout}}"
+#https://stackoverflow.com/questions/31912748/how-to-run-a-particular-task-on-specific-host-in-ansible
+
