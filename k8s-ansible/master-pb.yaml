@@ -80,7 +80,7 @@
     register: kubelet_status
   - name: Init k8s cluster
     ansible.builtin.shell:
-      cmd: kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.0.145
+      cmd: kubeadm init --pod-network-cidr={{ cni_subnet  }} --apiserver-advertise-address={{ hostvars[inventory_hostname].ansible_host }}
     when: kubelet_status.status.ActiveState == "activating"
   - name: Deploy CNI plugin
     ansible.builtin.shell: |
