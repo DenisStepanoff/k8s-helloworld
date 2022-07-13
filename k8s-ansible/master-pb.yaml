@@ -50,7 +50,7 @@
     with_items:
       - "kubelet={{ k8s_version  }}"
       - "kubeadm={{ k8s_version  }}"
-      - "kubectl={{ k8s_version  }}"
+#      - "kubectl={{ k8s_version  }}"
   - name: Hold k8s components
     dpkg_selections:
       name: "{{ item }}"
